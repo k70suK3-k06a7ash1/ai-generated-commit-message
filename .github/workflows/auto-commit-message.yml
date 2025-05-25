@@ -41,8 +41,9 @@ jobs:
         # プルリクエストのベースブランチと現在のヘッド間の差分（diff）を取得します。
         # これにより、このプルリクエストで導入された変更のみが対象となります。
         # -- . ':!*.lock' ':!.gitignore' を追加して、.lockファイルと.gitignoreファイルを除外します。
+        # さらに、取得した差分内容を 'head -c 50K' で最大50KBに制限します。
         run: |
-          DIFF_CONTENT=$(git diff "origin/${{ github.base_ref }}" "HEAD" -- . ':!*.lock' ':!.gitignore')
+          DIFF_CONTENT=$(git diff "origin/${{ github.base_ref }}" "HEAD" -- . ':!*.lock' ':!.gitignore' | head -c 50K)
           # 複数行の文字列をGitHub Actionsの出力としてエスケープします。
           echo "diff_output<<EOF" >> $GITHUB_OUTPUT
           echo "$DIFF_CONTENT" >> $GITHUB_OUTPUT
