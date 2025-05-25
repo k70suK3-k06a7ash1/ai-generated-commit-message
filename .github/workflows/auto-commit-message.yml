@@ -81,11 +81,9 @@ jobs:
           # ローカルに修正するコミットがあるかを確認します。
           if git rev-parse HEAD &>/dev/null; then
             echo "AIが生成したメッセージで最後のコミットを修正します。"
-            # AIのレスポンスをヒアドキュメントを使用して一時ファイルに書き込みます。
-            # これにより、特殊文字がシェルによって誤って解釈されることを防ぎます。
-            cat << 'EOF_MESSAGE' > generated_commit_message.txt
-            ${{ steps.ai_message.outputs.response }}
-            EOF_MESSAGE
+            # AIのレスポンスを一時ファイルに書き込みます。
+            # printf %s を使用して、特殊文字や改行がシェルによって誤って解釈されることを防ぎます。
+            printf "%s" "${{ steps.ai_message.outputs.response }}" > generated_commit_message.txt
             # git commit --amend -F コマンドを使用して、一時ファイルからメッセージを読み込み、最後のコミットメッセージを置き換えます。
             git commit --amend -F generated_commit_message.txt
             echo "修正されたコミットをプッシュします。"
