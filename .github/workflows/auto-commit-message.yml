@@ -28,6 +28,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # プルリクエストのヘッドブランチをチェックアウトします。
+          # これにより、detached HEAD状態ではなく、実際のブランチ上で作業できます。
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Gitユーザーを設定
         # コミットを作成する際に使用するGitユーザー名とメールアドレスを設定します。
@@ -40,8 +43,10 @@ jobs:
         id: get_diff
         # プルリクエストのベースブランチと現在のヘッド間の差分（diff）を取得します。
         # これにより、このプルリクエストで導入された変更のみが対象となります。
+        # -- . ':!*.lock' ':!.gitignore' を追加して、.lockファイルと.gitignoreファイルを除外します。
+        # さらに、取得した差分内容を 'head -c 50K' で最大50KBに制限します。
         run: |
-          DIFF_CONTENT=$(git diff "origin/${{ github.base_ref }}" "HEAD")
+          DIFF_CONTENT=$(git diff "origin/${{ github.base_ref }}" "HEAD" -- . ':!*.lock' ':!.gitignore' | head -c 50K)
           # 複数行の文字列をGitHub Actionsの出力としてエスケープします。
           echo "diff_output<<EOF" >> $GITHUB_OUTPUT
           echo "$DIFF_CONTENT" >> $GITHUB_OUTPUT
@@ -79,12 +84,16 @@ jobs:
           # ローカルに修正するコミットがあるかを確認します。
           if git rev-parse HEAD &>/dev/null; then
             echo "AIが生成したメッセージで最後のコミットを修正します。"
-            # git commit --amend コマンドを使用して、最後のコミットメッセージを新しいメッセージで置き換えます。
-            git commit --amend -m "${{ steps.ai_message.outputs.response }}"
+            # AIのレスポンスを一時ファイルに書き込みます。
+            # printf %s を使用して、特殊文字や改行がシェルによって誤って解釈されることを防ぎます。
+            printf "%s" "${{ steps.ai_message.outputs.response }}" > generated_commit_message.txt
+            # git commit --amend -F コマンドを使用して、一時ファイルからメッセージを読み込み、最後のコミットメッセージを置き換えます。
+            git commit --amend -F generated_commit_message.txt
             echo "修正されたコミットをプッシュします。"
             # 修正されたコミットを強制的にプッシュします。
             # --force は、履歴が変更された場合に必要です。
-            git push --force
+            # プルリクエストのヘッドブランチに明示的にプッシュします。
+            git push --force origin HEAD:${{ github.event.pull_request.head.ref }}
           else
             echo "修正するコミットが見つかりませんでした。コミットの修正をスキップします。"
           fi
